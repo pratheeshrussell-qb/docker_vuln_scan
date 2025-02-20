@@ -50,7 +50,7 @@ jobs:
             docker build -t "$image_name" "$build_context"
             
             echo "Scanning $image_name..."
-            scan_output=$(trivy image --no-progress --format table "$image_name")
+            scan_output=$(trivy image --no-progress --format template --template "@contrib/gitlab.tpl"  "$image_name")
             
             # Format scan result for PR comment
             comment_body+="### Vulnerability Scan Report for \`$file\`\n\`\`\`\n$scan_output\n\`\`\`\n"
