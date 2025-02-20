@@ -1,0 +1,61 @@
+name: Dockerfile Vulnerability Scan
+
+# Controls when the workflow will run
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - '**/Dockerfile'
+  # workflow_dispatch:
+
+jobs:
+  docker-vuln-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      # Maybe better to use some action to setup this
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget
+          wget https://github.com/aquasecurity/trivy/releases/download/v0.59.1/trivy_0.59.1_Linux-64bit.tar.gz
+          tar -xzf trivy_Linux-64bit.tar.gz
+          sudo mv trivy /usr/local/bin/
+      # Getting changed Dockerfiles
+      - name: Get changed Dockerfiles
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+        with:
+          files: '**/Dockerfile'
+    # VULN_SCAN_GITHUB_TOKEN should have permission to write to PR
+      - name: Build and scan each Dockerfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.VULN_SCAN_GITHUB_TOKEN }}
+        run: |
+          comment_body=""
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            dir=$(dirname "$file")
+            image_name="test-image-${dir//\//-}"
+            
+            echo "Building image for $file..."
+            docker build -t "$image_name" "$dir"
+            
+            echo "Scanning $image_name..."
+            scan_output=$(trivy image --no-progress --format table "$image_name")
+            
+            # Format scan result for PR comment
+            comment_body+="### Vulnerability Scan Report for \`$file\`\n\`\`\`\n$scan_output\n\`\`\`\n"
+          done
+          # Post comment to PR
+          if [ -n "$comment_body" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body "$comment_body"
+          fi
+        continue-on-error: true  # Ensures PR is not blocked even if vulnerabilities are found
+
+
+
+
+
+          
