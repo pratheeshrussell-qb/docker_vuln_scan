@@ -35,7 +35,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.VULN_SCAN_GITHUB_TOKEN }}
         run: |
           echo "files ${{ steps.changed-files.outputs.all_changed_files }}"
-          comment_body=""
+          comment_file=$(mktemp)  
+          echo "" > "$comment_file"  # Initialize the file
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             dir=$(dirname "$file")
             if [[ "$dir" == "." ]]; then
@@ -53,10 +54,11 @@ jobs:
             scan_output=$(trivy image --no-progress --format template --template "@contrib/gitlab.tpl"  "$image_name")
             
             # Format scan result for PR comment
-            comment_body+="### Vulnerability Scan Report for \`$file\`\n\`\`\`\n$scan_output\n\`\`\`\n"
+            # Append scan result to file
+            echo -e "### Vulnerability Scan Report for \`$file\`\n\`\`\`\n$scan_output\n\`\`\`\n" >> "$comment_file"
           done
           # Post comment to PR
-          if [ -n "$comment_body" ]; then
-            gh pr comment ${{ github.event.pull_request.number }} --body "$comment_body"
+          if [ -s "$comment_file" ]; then  # Only post if the file is not empty
+            gh pr comment ${{ github.event.pull_request.number }} --body-file "$comment_file"
           fi
         continue-on-error: true  # Ensures PR is not blocked even if vulnerabilities are found
