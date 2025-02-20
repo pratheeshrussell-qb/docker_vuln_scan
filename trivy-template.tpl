@@ -1,112 +1,34 @@
-{{- /* Template based on https://docs.gitlab.com/ee/user/application_security/container_scanning/#reports-json-format */ -}}
-{
-  "version": "15.0.7",
-  "scan": {
-    "analyzer": {
-      "id": "trivy",
-      "name": "Trivy",
-      "vendor": {
-        "name": "Aqua Security"
-      },
-      "version": "{{ appVersion }}"
-    },
-    "end_time": "{{ now | date "2006-01-02T15:04:05" }}",
-    "scanner": {
-      "id": "trivy",
-      "name": "Trivy",
-      "url": "https://github.com/aquasecurity/trivy/",
-      "vendor": {
-        "name": "Aqua Security"
-      },
-      "version": "{{ appVersion }}"
-    },
-    "start_time": "{{ now | date "2006-01-02T15:04:05" }}",
-    "status": "success",
-    "type": "container_scanning"
-  },
-  {{- $image := "Unknown" -}}
-  {{- $os := "Unknown" -}}
-  {{- range . }}
-    {{- if eq .Class "os-pkgs" -}}
-      {{- $target := .Target }}
-        {{- $image = $target | regexFind "[^\\s]+" }}
-        {{- $os = $target | splitList "(" | last | trimSuffix ")" }}
-    {{- end }}
-  {{- end }}
-  "vulnerabilities": [
-  {{- $t_first := true }}
-  {{- range . }}
-    {{- range .Vulnerabilities -}}
-    {{- if $t_first -}}
-      {{- $t_first = false -}}
-    {{ else -}}
-      ,
-    {{- end }}
-    {
-      "id": "{{ .VulnerabilityID }}",
-      "name": {{ .Title | printf "%q" }},
-      "description": {{ .Description | printf "%q" }},
-      "severity": {{ if eq .Severity "UNKNOWN" -}}
-                    "Unknown"
-                  {{- else if eq .Severity "LOW" -}}
-                    "Low"
-                  {{- else if eq .Severity "MEDIUM" -}}
-                    "Medium"
-                  {{- else if eq .Severity "HIGH" -}}
-                    "High"
-                  {{- else if eq .Severity "CRITICAL" -}}
-                    "Critical"
-                  {{-  else -}}
-                    "{{ .Severity }}"
-                  {{- end }},
-      "solution": {{ if .FixedVersion -}}
-                    "Upgrade {{ .PkgName }} to {{ .FixedVersion }}"
-                  {{- else -}}
-                    "No solution provided"
-                  {{- end }},
-      "location": {
-        "dependency": {
-          "package": {
-            "name": "{{ .PkgName }}"
-          },
-          "version": "{{ .InstalledVersion }}"
-        },
-        {{- /* TODO: No mapping available - https://github.com/aquasecurity/trivy/issues/332 */}}
-        "operating_system": "{{ $os }}",
-        "image": "{{ $image }}"
-      },
-      "identifiers": [
-        {
-	  {{- /* TODO: Type not extractable - https://github.com/aquasecurity/trivy-db/pull/24 */}}
-          "type": "cve",
-          "name": "{{ .VulnerabilityID }}",
-          "value": "{{ .VulnerabilityID }}"
-          {{- /* cf. https://gitlab.com/gitlab-org/security-products/security-report-schemas/-/blob/e3d280d7f0862ca66a1555ea8b24016a004bb914/dist/container-scanning-report-format.json#L157-179 */}}
-          {{- if .PrimaryURL | regexMatch "^(https?|ftp)://.+" -}},
-          "url": "{{ .PrimaryURL }}"
-          {{- end }}
-        }
-      ],
-      "links": [
-        {{- $l_first := true -}}
-        {{- range .References -}}
-        {{- if $l_first -}}
-          {{- $l_first = false }}
-        {{- else -}}
-          ,
-        {{- end -}}
-        {{- if . | regexMatch "^(https?|ftp)://.+" -}}
-        {
-          "url": "{{ . }}"
-        }
-        {{- else -}}
-          {{- $l_first = true }}
-        {{- end -}}
-        {{- end }}
-      ]
-    }
-    {{- end -}}
-  {{- end }}
-  ],
-  "remediations": []
-}
+{{- /* Trivy Markdown Report Template */ -}}
+# Trivy Vulnerability Report
+
+## Target: `{{ (index . 0).Target }}`
+- **Type:** {{ (index . 0).Type }}
+- **Generated At:** {{ now }}
+
+{{- range . }}
+### 🔍 Scan Results for `{{ .Type }}`
+{{- if (eq (len .Vulnerabilities) 0) }}
+✅ **No vulnerabilities found!**
+{{- else }}
+| **Package** | **Vulnerability ID** | **Severity** | **Installed Version** | **Fixed Version** | **Links** |
+|------------|------------------|-------------|-----------------|---------------|--------|
+{{- range .Vulnerabilities }}
+| `{{ .PkgName }}` | [`{{ .VulnerabilityID }}`]({{ .PrimaryURL }}) | **{{ .Severity }}** | `{{ .InstalledVersion }}` | {{ if .FixedVersion }}`{{ .FixedVersion }}`{{ else }}❌ Not fixed{{ end }} |  
+{{- range .References }}[link]({{ . }}) {{ end }} |
+{{- end }}
+{{- end }}
+    
+{{- if (eq (len .Misconfigurations) 0) }}
+✅ **No misconfigurations found!**
+{{- else }}
+### ⚠️ Misconfigurations Found
+| **Type** | **Misconf ID** | **Check** | **Severity** | **Message** |
+|----------|--------------|--------|------------|----------|
+{{- range .Misconfigurations }}
+| `{{ .Type }}` | `{{ .ID }}` | `{{ .Title }}` | **{{ .Severity }}** | {{ .Message }}<br>[link]({{ .PrimaryURL }}) |
+{{- end }}
+{{- end }}
+{{- end }}
+
+---
+⏳ **Scan completed at:** {{ now }}
