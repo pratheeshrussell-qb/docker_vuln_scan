@@ -34,10 +34,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.VULN_SCAN_GITHUB_TOKEN }}
         run: |
+          echo "files ${{ steps.changed-files.outputs.all_changed_files }}"
           comment_body=""
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             dir=$(dirname "$file")
-            image_name="test-image-${dir//\//-}"
+            dir=${dir//\//-}  # Replace slashes with dashes
+            dir=${dir//./root}  # Ensure root is not just a dot
+            image_name="test-image-${dir}"
             
             echo "Building image for $file..."
             docker build -t "$image_name" "$dir"
@@ -53,9 +56,3 @@ jobs:
             gh pr comment ${{ github.event.pull_request.number }} --body "$comment_body"
           fi
         continue-on-error: true  # Ensures PR is not blocked even if vulnerabilities are found
-
-
-
-
-
-          
