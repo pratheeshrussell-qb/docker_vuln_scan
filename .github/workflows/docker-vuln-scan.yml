@@ -55,7 +55,7 @@ jobs:
             
             # Format scan result for PR comment
             # Append scan result to file
-            echo -e "### Vulnerability Scan Report for \`$file\`\n\`\`\`\n$scan_output\n\`\`\`\n" >> "$comment_file"
+            echo -e "### Vulnerability Scan Report for \`$file\`\n \n$scan_output\n\n" >> "$comment_file"
           done
           # Post comment to PR
           if [ -s "$comment_file" ]; then  # Only post if the file is not empty
