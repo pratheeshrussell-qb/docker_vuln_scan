@@ -51,7 +51,7 @@ jobs:
             docker build -t "$image_name" "$build_context"
             
             echo "Scanning $image_name..."
-            scan_output=$(trivy image --no-progress --format template --template "@contrib/gitlab.tpl"  "$image_name")
+            scan_output=$(trivy image --no-progress --format template --template "@contrib/gitlab-codequality.tpl"  "$image_name")
             
             # Format scan result for PR comment
             # Append scan result to file
