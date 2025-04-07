@@ -7,7 +7,8 @@ on:
     paths:
       - '**/Dockerfile'
   # workflow_dispatch:
-
+permissions:
+  pull-requests: write
 jobs:
   docker-vuln-scan:
     runs-on: ubuntu-latest
@@ -32,10 +33,9 @@ jobs:
     # VULN_SCAN_GITHUB_TOKEN should have permission to write to PR
       - name: Build and scan each Dockerfile
         env:
-          GITHUB_TOKEN: ${{ secrets.VULN_SCAN_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.name "trivy-action"
-          git config --global user.email "VulnScanAction@github.com"
+
           echo "files ${{ steps.changed-files.outputs.all_changed_files }}"
           comment_file=$(mktemp)  
           echo "" > "$comment_file"  # Initialize the file
